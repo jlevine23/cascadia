@@ -1,0 +1,150 @@
+Presentation at Cascadia R Conference
+June 5, 2020
+Jill Levine
+
+Clio Infra README: https://rdrr.io/github/basm92/Clio/f/README.md 
+
+Install Clio Package
+```{r}
+
+install.packages("remotes")
+remotes::install_github("basm92/Clio")
+
+library(Clio)
+
+```
+Clio Infra Variables by Start Date
+```{r}
+
+library(tidyverse)
+
+df <-
+clio_overview() %>%
+summarize(variable_name, from) 
+
+sixteenth <-
+df %>%
+filter(from >= 1500) %>%
+filter(from <= 1599) %>%
+mutate(century = "16th")
+
+seventeenth <-
+df %>%
+filter(from >= 1600) %>%
+filter(from <= 1699) %>%
+mutate(century = "17th")
+
+eighteenth <-
+df %>%
+filter(from >= 1700) %>%
+filter(from <= 1799) %>%
+mutate(century = "18th")
+
+nineteenth <-
+df %>%
+filter(from >= 1800) %>%
+filter(from <= 1899) %>%
+mutate(century = "19th")
+
+twentieth <-
+df %>%
+filter(from >= 1900) %>%
+filter(from <= 1999) %>%
+mutate(century = "20th")
+
+df2 <-
+rbind(sixteenth, seventeenth, eighteenth, nineteenth, twentieth) %>%
+count(century)
+
+plot <-
+ggplot(df2, aes(x = century, y = n)) + geom_col(width = 0.5, fill="blue") + theme_minimal() +
+           labs(title="Distribution of Start Dates for Clio Infra Variables", caption = "Source: Clio Infra. Visualization by Jill Levine. Twitter: @jdlevine. https://github.com/jlevine23") + ylab("Number of Variables") + xlab("Century")
+
+plot
+
+```
+
+Book Titles per Capita in France and Italy
+```{r}
+
+bookdf <-
+clio_get(c("book titles per capita"), 
+         from = 1500, to = 1800, 
+         countries = c("France", "Italy"))
+
+ggplot(bookdf, aes(x = year, y = `Book Titles per Capita`, color = country.name)) + 
+  geom_line() + 
+  theme_minimal() + 
+  labs(title="Book Titles per Capita", subtitle = "Number of new books published per year per million people", caption = "Source: Clio Infra. Visualization by Jill Levine. Twitter: @jdlevine. https://github.com/jlevine23", color = "Country Name") + 
+  ylab("New Books Published") + 
+  xlab("Year")
+
+```
+
+
+Chinese Agricultural Animals in 1600
+```{r}
+
+animaldf <-
+clio_get(c("total number of goats", "total number of sheep", "total number of pigs", "total cattle"), from = 1600, to = 1601, countries = c("China")) %>%
+na.omit() %>%
+group_by(country.name) %>%
+mutate(Total_Animals = (`Total Number of Goats` + `Total Number of Sheep` + `Total Number of Pigs` + `Total Cattle`)) %>%
+mutate(Goats = (`Total Number of Goats`/ Total_Animals) * 100) %>%
+mutate(Sheep = (`Total Number of Sheep`/ Total_Animals) * 100) %>%
+mutate(Pigs = (`Total Number of Pigs`/ Total_Animals) * 100) %>%  
+mutate(Cattle = (`Total Cattle`/ Total_Animals) * 100) %>%
+summarize(country.name, Goats, Pigs, Sheep, Cattle) %>%
+pivot_longer(c(Goats, Pigs, Sheep, Cattle), names_to = "names", values_to = "var")
+
+ndeep <- 10
+tb4waffles <- expand.grid(y = 1:ndeep,
+                          x = seq_len(ceiling(sum(animaldf$var) / ndeep)))
+
+regionvec <- rep(animaldf$names, animaldf$var)
+
+# Depending on the value of ndeep, there might be more spots on the x-y grid
+# than there are cases - so fill those with NA
+tb4waffles$region <- c(regionvec, rep(NA, nrow(tb4waffles) - length(regionvec)))
+                    
+# Plot it
+ggplot(tb4waffles, aes(x = x, y = y, fill = region)) + 
+    geom_tile(color = "white") + # The color of the lines between tiles
+    scale_fill_manual("Animals",
+                      values = RColorBrewer::brewer.pal(5, "Dark2")) +
+    labs(title="Goats, Cattle, Sheep, and Pigs in China (1600)", caption = "Source: Clio Infra. Visualization by Jill Levine. Twitter: @jdlevine. https://github.com/jlevine23") + 
+  theme(axis.title = element_blank(),
+        axis.text = element_blank())
+```
+
+Pastureland vs. Cropland in 19 Countries in 1700
+```{r}
+
+
+landdf <-
+  clio_get(c("total cropland", "total pasture"), from = 1700, to = 1701, countries = c("Afghanistan", "Argentina", "Brazil", "Ghana", "Cambodia", "China", "Colombia", "Mali", "Madagascar", "Nepal", "Lithuania", "Cuba", "Spain", "Kyrgyzstan", "Iceland", "Japan", "Russia", "Germany", "Italy")) %>%
+  na.omit() %>%
+  mutate(Land = (`Total Cropland` + `Total Pasture`)) %>%
+  mutate(Cropland = (`Total Cropland`/Land) * 100) %>%
+  mutate(Pasture = (`Total Pasture`/Land) * 100) %>%
+  pivot_longer(c(`Cropland`, `Pasture`), names_to = "names", values_to = "values") 
+  
+
+landdf
+
+brks <- seq(-15000000, 15000000, 5000000)
+lbls = paste0(as.character(c(seq(15, 0, -5), seq(5, 15, 5))), "m")
+
+ggplot(landdf, aes(x = country.name, y = values, fill = names)) + 
+                              geom_bar(stat = "identity", width = .6) + 
+                              scale_y_continuous(breaks = brks,   
+                              labels = lbls) + #
+                              coord_flip() +  # Flip axes
+                              theme(plot.title = element_text(hjust = .5), 
+                                    axis.ticks = element_blank()) +   
+                              scale_fill_brewer(palette = "Dark2") +
+  labs(title="Historical Land Use (1700)", caption = "Source: Clio Infra. Visualization by Jill Levine. Twitter: @jdlevine. https://github.com/jlevine23", color = "Land Type") + ylab("") + xlab("") + theme(axis.text.x = element_blank())
+```
+
+
+
